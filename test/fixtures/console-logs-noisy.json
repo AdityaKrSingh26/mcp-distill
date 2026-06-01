@@ -1,0 +1,68 @@
+[
+    {
+        "level": "error",
+        "text": "TypeError: Cannot read properties of undefined (reading 'map')",
+        "source": "app.js",
+        "url": "http://localhost:3000/app.js",
+        "line": 42
+    },
+    {
+        "level": "error",
+        "text": "TypeError: Cannot read properties of undefined (reading 'map')",
+        "source": "app.js",
+        "url": "http://localhost:3000/app.js",
+        "line": 42
+    },
+    {
+        "level": "error",
+        "text": "TypeError: Cannot read properties of undefined (reading 'map')",
+        "source": "app.js",
+        "url": "http://localhost:3000/app.js",
+        "line": 42
+    },
+    {
+        "level": "warning",
+        "text": "Warning: Each child in a list should have a unique \"key\" prop.",
+        "source": "react-dom.development.js"
+    },
+    {
+        "level": "warning",
+        "text": "Warning: Each child in a list should have a unique \"key\" prop.",
+        "source": "react-dom.development.js"
+    },
+    {
+        "level": "warning",
+        "text": "Warning: Each child in a list should have a unique \"key\" prop.",
+        "source": "react-dom.development.js"
+    },
+    {
+        "level": "warning",
+        "text": "Warning: Each child in a list should have a unique \"key\" prop.",
+        "source": "react-dom.development.js"
+    },
+    {
+        "level": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "source": "http://localhost:3000/api/users",
+        "url": "http://localhost:3000/api/users"
+    },
+    { "level": "log", "text": "[HMR] Waiting for update signal from WDS...", "source": "webpack" },
+    { "level": "log", "text": "[HMR] App is up to date.", "source": "webpack" },
+    {
+        "level": "warning",
+        "text": "componentWillMount has been renamed, and is not recommended for use. See https://reactjs.org/link/unsafe-component-lifecycles for details.",
+        "source": "react-dom.development.js"
+    },
+    {
+        "level": "error",
+        "text": "Uncaught ReferenceError: processOrder is not defined",
+        "source": "checkout.js",
+        "url": "http://localhost:3000/checkout.js",
+        "line": 88
+    },
+    {
+        "level": "warning",
+        "text": "Download the React DevTools for a better development experience",
+        "source": "react-dom.development.js"
+    }
+]

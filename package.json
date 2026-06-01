@@ -1,0 +1,37 @@
+{
+  "name": "mcp-distill",
+  "version": "0.1.1",
+  "description": "Context compression proxy for browser DevTools MCP servers",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "mcp-distill": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/**/*.test.js",
+    "lint": "eslint src/ test/",
+    "lint:fix": "eslint src/ test/ --fix",
+    "format": "prettier --write src/ test/",
+    "format:check": "prettier --check src/ test/"
+  },
+  "keywords": [
+    "mcp",
+    "browser",
+    "devtools",
+    "ai",
+    "proxy"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "source-map-js": "^1.2.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3"
+  }
+}
