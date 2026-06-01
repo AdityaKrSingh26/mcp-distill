@@ -9,7 +9,7 @@ A single computed-style call returns 300+ CSS properties. A console dump from a 
 ## How it works
 
 ```mermaid
-flowchart LR
+flowchart TD
     AI["AI Assistant\n(Claude, Cursor, etc.)"]
     LENS["mcp-distill\n(proxy)"]
     BACKEND["Browser MCP\n(chrome-devtools-mcp,\nPlaywright MCP, etc.)"]
