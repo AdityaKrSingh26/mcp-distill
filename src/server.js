@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { handleDiagnoseElement } from "./tools/diagnose-element.js";
 import { handleGetErrors } from "./tools/get-errors.js";
+import { handleGetPageOutline } from "./tools/page-outline.js";
 
 export function createServer() {
     const server = new McpServer({
@@ -50,6 +51,27 @@ export function createServer() {
                 ),
         },
         handleGetErrors,
+    );
+
+    server.tool(
+        "get_page_outline",
+        "Fetches the page accessibility snapshot and compresses it into a structural outline: landmarks, headings, and interactive elements, with element references preserved so they can still be clicked. Collapses wrapper nesting and folds repeated lists (feeds, tables, product grids). Typically 90%+ fewer tokens than a raw snapshot.",
+        {
+            include: z
+                .enum(["interactive", "all"])
+                .default("interactive")
+                .describe(
+                    "'interactive' keeps interactive elements, landmarks, headings, and alerts. 'all' keeps every node but still folds repeated lists.",
+                ),
+            limit: z
+                .number()
+                .int()
+                .min(1)
+                .max(1000)
+                .default(150)
+                .describe("Max number of nodes to return"),
+        },
+        handleGetPageOutline,
     );
 
     return server;
