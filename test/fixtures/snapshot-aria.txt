@@ -1,0 +1,36 @@
+- Page URL: https://shop.example.com/checkout
+- Page Title: Checkout
+- Page Snapshot:
+```yaml
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "Shop" [ref=e5]:
+          - /url: /
+      - navigation [ref=e6]:
+        - link "Cart" [ref=e7]
+        - link "Account" [ref=e8]
+  - main [ref=e9]:
+    - heading "Checkout" [level=1] [ref=e10]
+    - alert [ref=e11]: Payment method declined
+    - list [ref=e12]:
+      - listitem [ref=e13]:
+        - generic [ref=e14]: Widget A
+      - listitem [ref=e15]:
+        - generic [ref=e16]: Widget B
+      - listitem [ref=e17]:
+        - generic [ref=e18]: Widget C
+      - listitem [ref=e19]:
+        - generic [ref=e20]: Widget D
+      - listitem [ref=e21]:
+        - generic [ref=e22]: Widget E
+      - listitem [ref=e23]:
+        - generic [ref=e24]: Widget F
+      - listitem [ref=e25]:
+        - generic [ref=e26]: Widget G
+    - textbox "Card number" [ref=e27]
+    - button "Place order" [ref=e28]
+  - contentinfo [ref=e29]:
+    - paragraph [ref=e30]: Copyright 2026
+```
