@@ -27,6 +27,7 @@ flowchart TD
         LAY["layout analysis\nposition, z-index, box model"]
         DEDUP["console-dedup\nde-noise & rank errors"]
         SM["sourcemap resolver\nminified → source frames"]
+        OUT["outline\nprune wrappers, fold repeats"]
     end
 
     LENS --> compression
@@ -41,6 +42,7 @@ flowchart TD
 |----------|-----------|-----------------|-----------|
 | `diagnose_element` on a `body` element | ~6,000 tokens | ~300 tokens | 95% |
 | `get_errors` on a React app with console noise | ~4,000 tokens | ~200 tokens | 95% |
+| `get_page_outline` on a 100-item product listing | ~6,200 tokens | ~230 tokens | 96% |
 
 ---
 
@@ -160,6 +162,43 @@ Example output:
 ```
 
 Filtered out: React key warnings, HMR messages, DevTools download prompts, deprecation notices. Sourcemap resolution falls back silently to the raw frame on any fetch or parse failure.
+
+---
+
+### `get_page_outline`
+
+Fetches the page accessibility snapshot and compresses it into a structural outline: landmarks, headings, and interactive elements. **Element references are preserved verbatim**, so anything in the outline can still be clicked or filled through the backend MCP in a follow-up call.
+
+The backend's snapshot tool is discovered at runtime (`take_snapshot`, `browser_snapshot`, or any tool matching `/snapshot|accessibility|a11y/`), and both the `[ref=e12]` and `uid=1_12` reference styles are understood.
+
+Parameters:
+- `include`: `"interactive"` | `"all"` (default: `"interactive"`). `"interactive"` keeps interactive elements, landmarks, headings, alerts, and the list/table structure around them. `"all"` keeps every node but still folds repeated runs.
+- `limit` (number, default: `150`): max nodes to return
+
+Example output:
+```json
+{
+  "summary": "Checkout | 5 interactive, 4 landmarks, 1 heading, 1 alert (11 of 30 nodes, 63% reduction)",
+  "details": {
+    "total_nodes": 30,
+    "title": "Checkout",
+    "outline": [
+      { "role": "main", "ref": "e9", "children": [
+        { "role": "heading", "name": "Checkout", "ref": "e10", "level": 1 },
+        { "role": "alert", "name": "Payment method declined", "ref": "e11" },
+        { "role": "textbox", "name": "Card number", "ref": "e27" },
+        { "role": "button", "name": "Place order", "ref": "e28" }
+      ]}
+    ]
+  }
+}
+```
+
+How it compresses:
+- **Wrapper nesting is spliced away.** Unnamed `generic`/`div` chains collapse, so their meaningful children move up to the nearest real ancestor.
+- **Repeated runs fold into a count.** 100 identical product cards become 3 plus `{"role":"listitem","repeated":97}`, which is where most of the savings on real pages come from.
+- **Icon-only controls borrow a label.** An unnamed button whose text lives on a child node is reported with that name. Landmarks deliberately do not borrow, since that would invent a label the page never had.
+- **Long names are truncated** to 60 characters.
 
 ---
 
