@@ -10,6 +10,7 @@ const ready = new Promise((res, rej) => {
     _readyResolve = res;
     _readyReject = rej;
 });
+ready.catch(() => {});
 
 export async function connectBackend() {
     const cmd = process.env.MCP_DISTILL_BACKEND_CMD;

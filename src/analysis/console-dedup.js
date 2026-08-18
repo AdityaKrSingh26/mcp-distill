@@ -37,7 +37,7 @@ export async function deduplicateErrors(
         debug: 0 
     };
     
-    const minRank = severityRank[severity] ?? 1;
+    const minRank = severity === "all" ? 0 : (severityRank[severity] ?? 1);
 
     const seen = new Map();
 
@@ -77,24 +77,25 @@ export async function deduplicateErrors(
         return b.count - a.count;
     });
 
-    let resolvedCount = 0;
     const top = sorted.slice(0, limit);
 
-    const out = [];
-    
-    for (const { entry, count } of top) {
-        
-        const stackInfo = await compressStack(entry.stackTrace ?? entry.stack ?? null, resolver);
+    const stackInfos = await Promise.all(
+        top.map(({ entry }) => compressStack(entry.stackTrace ?? entry.stack ?? null, resolver)),
+    );
+
+    let resolvedCount = 0;
+    const out = top.map(({ entry, count }, i) => {
+        const stackInfo = stackInfos[i];
         resolvedCount += stackInfo.resolvedCount;
-        
-        out.push({
+
+        return {
             level: entry.level ?? entry.type ?? "log",
             message: entry.text ?? entry.message ?? "",
             count,
             source: entry.source ?? entry.url ?? null,
             stackTrace: stackInfo.frames,
-        });
-    }
+        };
+    });
 
     return { issues: out, resolvedCount };
 }
@@ -105,7 +106,9 @@ async function compressStack(stack, resolver) {
         return { frames: null, resolvedCount: 0 };
     }
     
-    const rawFrames = Array.isArray(stack) ? stack : stack.split("\n");
+    const rawFrames = Array.isArray(stack)
+        ? stack
+        : stack.split("\n").filter((line) => /^\s*at\s/.test(line));
     const parsed = rawFrames
         .map(parseFrame)
         .filter((f) => f && !isInternalFrame(f))
