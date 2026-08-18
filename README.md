@@ -128,7 +128,30 @@ Example output (batch, with a typo selector triggering suggestions):
 }
 ```
 
-Detects: `opacity:0`, `display:none`, `visibility:hidden`, `clip-path` clipping, zero-size with `overflow:hidden`, `pointer-events:none`, unanchored absolute positioning, `z-index` on static elements.
+Detects: `opacity:0`, `display:none`, `visibility:hidden`, `clip-path` clipping, zero-size with `overflow:hidden`, `pointer-events:none`, unanchored absolute positioning, `z-index` on static elements, and elements covered by something else.
+
+**Click blockers.** An element can pass every style check and still be unclickable because something sits on top of it. `diagnose_element` hit-tests each element's center with `document.elementFromPoint` and names whatever intercepts the click:
+
+```json
+{
+  "summary": "#submit-button: covered-by:div#cookie-banner (likely cause)",
+  "details": {
+    "selector": "#submit-button",
+    "issues": [
+      {
+        "type": "obscured",
+        "property": "covered-by",
+        "value": "div#cookie-banner",
+        "severity": "high",
+        "note": "div#cookie-banner covers the viewport (position:fixed, z-index:9999) and intercepts clicks"
+      }
+    ],
+    "styles": { "display": "inline-flex", "opacity": "1", "visibility": "visible" }
+  }
+}
+```
+
+Every computed style there reports a perfectly visible button, which is exactly why style inspection alone cannot answer "why does clicking this do nothing". A descendant on top is not reported, since the click still lands inside the element. Elements scrolled outside the viewport are reported as `off-screen` rather than guessed at, because the hit test cannot run on them.
 
 ---
 

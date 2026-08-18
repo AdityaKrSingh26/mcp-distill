@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detectVisibilityIssues } from "../src/analysis/visibility.js";
+import { detectVisibilityIssues, detectObstructionIssues } from "../src/analysis/visibility.js";
 
 test("detects opacity:0", () => {
     const issues = detectVisibilityIssues({
@@ -52,4 +52,50 @@ test("flags nearly-invisible opacity", () => {
         visibility: "visible",
     });
     assert.ok(issues.some((i) => i.type === "nearly-invisible"));
+});
+
+test("flags an element covered by another element", () => {
+    const issues = detectObstructionIssues({
+        obstruction: {
+            selector: "div#modal-backdrop",
+            position: "fixed",
+            zIndex: "999",
+            coversViewport: true,
+        },
+        offScreen: false,
+    });
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].type, "obscured");
+    assert.equal(issues[0].severity, "high");
+    assert.equal(issues[0].value, "div#modal-backdrop");
+    assert.ok(issues[0].note.includes("covers the viewport"));
+});
+
+test("describes a partial cover differently from a full-viewport one", () => {
+    const issues = detectObstructionIssues({
+        obstruction: {
+            selector: "span.tooltip",
+            position: "absolute",
+            zIndex: "10",
+            coversViewport: false,
+        },
+    });
+    assert.ok(issues[0].note.includes("sits on top"));
+    assert.ok(!issues[0].note.includes("covers the viewport"));
+});
+
+test("reports off-screen elements instead of a false obstruction", () => {
+    const issues = detectObstructionIssues({ obstruction: null, offScreen: true });
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].type, "off-screen");
+    assert.equal(issues[0].severity, "low");
+});
+
+test("no obstruction issue for an unobstructed element", () => {
+    assert.deepEqual(detectObstructionIssues({ obstruction: null, offScreen: false }), []);
+});
+
+test("tolerates a result carrying no hit test at all", () => {
+    assert.deepEqual(detectObstructionIssues({}), []);
+    assert.deepEqual(detectObstructionIssues(), []);
 });
