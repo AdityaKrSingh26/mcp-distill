@@ -3,7 +3,7 @@ import { connectBackend } from "./client.js";
 import { createServer, startServer } from "./server.js";
 
 // Start MCP server immediately so Claude Code can register tools.
-// Backend connection happens in parallel; tool calls await the ready promise in client.js.
+// Backend connection happens in parallel; tool calls await backend readiness before executing.
 const server = createServer();
 
 connectBackend().catch((err) => {
