@@ -22,6 +22,17 @@ test("detects zero height", () => {
     assert.ok(issues.some((i) => i.type === "zero-height" && i.severity === "high"));
 });
 
+test("no zero-height issue when max-height:0px is set intentionally", () => {
+    const issues = detectLayoutIssues({
+        width: "100px",
+        height: "0px",
+        "max-height": "0px",
+        position: "static",
+        "z-index": "auto",
+    });
+    assert.ok(!issues.some((i) => i.type === "zero-height"));
+});
+
 test("flags unanchored absolute position", () => {
     const issues = detectLayoutIssues({
         position: "absolute",

@@ -2,6 +2,7 @@ import { callTool } from "../client.js";
 import { filterComputedStyles } from "../analysis/css-filter.js";
 import { detectVisibilityIssues } from "../analysis/visibility.js";
 import { detectLayoutIssues } from "../analysis/layout.js";
+import { parseFencedJson } from "../util.js";
 
 export async function handleDiagnoseElement({ selector, include_box_model }) {
     const selectors = Array.isArray(selector) ? selector : [selector];
@@ -197,9 +198,7 @@ function buildBatchSummary(results) {
 function extractPayload(raw) {
     if (raw?.content?.[0]?.text) {
         const text = raw.content[0].text;
-        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        const jsonText = jsonMatch ? jsonMatch[1] : text;
-        const parsed = JSON.parse(jsonText);
+        const parsed = parseFencedJson(text);
         if (parsed === null) {
             throw new Error("Script returned null");
         }

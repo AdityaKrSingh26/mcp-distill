@@ -42,6 +42,37 @@ test("returns highest severity first", async () => {
     assert.equal(issues[0].level, "error");
 });
 
+test("severity:'all' includes debug-level entries", async () => {
+    const debugLogs = [{ level: "debug", text: "some debug detail" }];
+    const { issues } = await deduplicateErrors(debugLogs, { severity: "all", limit: 20 });
+    assert.ok(issues.some((e) => e.level === "debug"));
+});
+
+test("severity:'all' includes verbose-level entries", async () => {
+    const verboseLogs = [{ level: "verbose", text: "some verbose detail" }];
+    const { issues } = await deduplicateErrors(verboseLogs, { severity: "all", limit: 20 });
+    assert.ok(issues.some((e) => e.level === "verbose"));
+});
+
+test("string stack: message line is excluded from stackTrace frames", async () => {
+    const logs = [
+        {
+            level: "error",
+            text: "TypeError: x is undefined",
+            stack: "TypeError: x is undefined\n  at a (a.js:1:1)\n  at b (b.js:2:2)\n  at c (c.js:3:3)",
+        },
+    ];
+    const { issues } = await deduplicateErrors(logs, { severity: "error", limit: 20 });
+    const frames = issues[0].stackTrace;
+    assert.ok(
+        frames.every((f) => !f.includes("TypeError: x is undefined")),
+        "message line should not appear as a stack frame",
+    );
+    assert.ok(frames.some((f) => f.includes("a.js")));
+    assert.ok(frames.some((f) => f.includes("b.js")));
+    assert.ok(frames.some((f) => f.includes("c.js")));
+});
+
 test("sourcemap resolver rewrites frame when map resolves", async () => {
     const fakeMap = JSON.stringify({
         version: 3,
