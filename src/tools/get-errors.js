@@ -1,32 +1,57 @@
-import { callTool } from "../client.js";
+import { callTool, listTools } from "../client.js";
 import { deduplicateErrors } from "../analysis/console-dedup.js";
 import { createResolver } from "../analysis/sourcemap.js";
+import { parseFencedJson } from "../util.js";
 
 export async function handleGetErrors({ severity, limit, resolve_sourcemaps }) {
+    const types =
+        severity === "error" ? ["error"] : severity === "warning" ? ["warn", "error"] : [];
+    const candidates = ["list_console_messages", "getConsoleHistory", "get_console_logs"];
+    const errors = [];
     let raw;
-    try {
-        const types =
-            severity === "error" ? ["error"] : severity === "warning" ? ["warn", "error"] : [];
-        raw = await callTool("list_console_messages", types.length ? { types } : {});
-    } catch (err) {
+
+    for (const name of candidates) {
         try {
-            raw = await callTool("getConsoleHistory", {});
+            raw = await callTool(
+                name,
+                name === "list_console_messages" && types.length ? { types } : {},
+            );
+            break;
+        } catch (err) {
+            errors.push(`${name}: ${err.message}`);
+        }
+    }
+
+    if (raw === undefined) {
+        let tools = [];
+        try {
+            tools = await listTools();
         } catch {
+            // no discovery available; fall through to the error report below
+        }
+        const discovered = tools.find(
+            (t) => !candidates.includes(t.name) && /console|log/i.test(t.name),
+        );
+        if (discovered) {
             try {
-                raw = await callTool("get_console_logs", {});
-            } catch {
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: JSON.stringify({
-                                _lens_warning: `Could not fetch console logs: ${err.message}`,
-                            }),
-                        },
-                    ],
-                };
+                raw = await callTool(discovered.name, {});
+            } catch (err) {
+                errors.push(`${discovered.name}: ${err.message}`);
             }
         }
+    }
+
+    if (raw === undefined) {
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: JSON.stringify({
+                        _lens_warning: `Could not fetch console logs. ${errors.join("; ")}`,
+                    }),
+                },
+            ],
+        };
     }
 
     let logs;
@@ -95,9 +120,7 @@ function extractLogs(raw) {
         if (/no console messages/i.test(text) || /^##\s/m.test(text)) {
             return [];
         }
-        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        const jsonText = jsonMatch ? jsonMatch[1] : text;
-        const parsed = JSON.parse(jsonText);
+        const parsed = parseFencedJson(text);
         if (Array.isArray(parsed)) {
             return parsed;
         }

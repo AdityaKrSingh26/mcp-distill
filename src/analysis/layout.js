@@ -27,7 +27,12 @@ export function detectLayoutIssues(styles) {
         });
     }
     
-    if (!isNaN(h) && h === 0 && styles["min-height"] !== "0px") {
+    if (
+        !isNaN(h) &&
+        h === 0 &&
+        styles["min-height"] !== "0px" &&
+        styles["max-height"] !== "0px"
+    ) {
         issues.push({
             type: "zero-height",
             property: "height",

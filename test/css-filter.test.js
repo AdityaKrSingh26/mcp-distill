@@ -41,6 +41,14 @@ test("keeps interesting tier 2 values", () => {
     assert.ok("background-color" in result);
 });
 
+test("keeps font-size:0px (a real invisible-text bug signal, not boring)", () => {
+    const result = filterComputedStyles({
+        ...fixture.result,
+        "font-size": "0px",
+    });
+    assert.equal(result["font-size"], "0px");
+});
+
 test("drops all tier 3 properties (webkit, animation internals, font-feature-settings)", () => {
     const result = filterComputedStyles(fixture.result);
     const tier3 = [

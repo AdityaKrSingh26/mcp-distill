@@ -75,7 +75,6 @@ const BORING_TIER2 = new Set([
     "normal",
     "auto",
     "rgb(0, 0, 0)",
-    "0px",
     "inherit",
     "initial",
 ]);
