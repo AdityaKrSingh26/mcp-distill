@@ -1,6 +1,6 @@
 import { callTool } from "../client.js";
 import { filterComputedStyles } from "../analysis/css-filter.js";
-import { detectVisibilityIssues } from "../analysis/visibility.js";
+import { detectVisibilityIssues, detectObstructionIssues } from "../analysis/visibility.js";
 import { detectLayoutIssues } from "../analysis/layout.js";
 import { parseFencedJson } from "../util.js";
 
@@ -10,55 +10,7 @@ export async function handleDiagnoseElement({ selector, include_box_model }) {
 
     let raw;
     try {
-        const selectorsJson = JSON.stringify(selectors);
-        raw = await callTool("evaluate_script", {
-            function: `() => {
-        const selectors = ${selectorsJson};
-        function suggest(sel) {
-          const out = new Set();
-          const idTokens = [...sel.matchAll(/#([\\w-]+)/g)].map(m => m[1].toLowerCase());
-          const classTokens = [...sel.matchAll(/\\.([\\w-]+)/g)].map(m => m[1].toLowerCase());
-          if (idTokens.length) {
-            document.querySelectorAll('[id]').forEach(el => {
-              const id = el.id.toLowerCase();
-              for (const t of idTokens) {
-                if (id === t || id.includes(t) || t.includes(id)) out.add('#' + el.id);
-              }
-            });
-          }
-          if (classTokens.length) {
-            const seen = new Set();
-            document.querySelectorAll('[class]').forEach(el => {
-              el.classList.forEach(c => {
-                if (seen.has(c)) return;
-                seen.add(c);
-                const lc = c.toLowerCase();
-                for (const t of classTokens) {
-                  if (lc === t || lc.includes(t) || t.includes(lc)) out.add('.' + c);
-                }
-              });
-            });
-          }
-          const tokens = [...idTokens, ...classTokens];
-          const refLen = tokens.length ? Math.max(...tokens.map(t => t.length)) : 0;
-          return [...out].sort((a, b) => Math.abs(a.length - refLen) - Math.abs(b.length - refLen)).slice(0, 5);
-        }
-        const results = selectors.map(sel => {
-          let el = null;
-          try { el = document.querySelector(sel); } catch (e) { return { selector: sel, notFound: true, error: e.message, suggestions: [] }; }
-          if (!el) return { selector: sel, notFound: true, suggestions: suggest(sel) };
-          const cs = window.getComputedStyle(el);
-          const styles = {};
-          for (let i = 0; i < cs.length; i++) {
-            const prop = cs[i];
-            styles[prop] = cs.getPropertyValue(prop);
-          }
-          const rect = el.getBoundingClientRect();
-          return { selector: sel, styles, rect: { width: rect.width, height: rect.height, top: rect.top, left: rect.left } };
-        });
-        return { results };
-      }`,
-        });
+        raw = await callTool("evaluate_script", { function: buildScript(selectors) });
     } catch (err) {
         return {
             content: [
@@ -99,14 +51,7 @@ export async function handleDiagnoseElement({ selector, include_box_model }) {
             content: [
                 {
                     type: "text",
-                    text: JSON.stringify(
-                        {
-                            summary: r.summary,
-                            details: r.details,
-                        },
-                        null,
-                        2,
-                    ),
+                    text: JSON.stringify({ summary: r.summary, details: r.details }),
                 },
             ],
         };
@@ -117,14 +62,10 @@ export async function handleDiagnoseElement({ selector, include_box_model }) {
         content: [
             {
                 type: "text",
-                text: JSON.stringify(
-                    {
-                        summary,
-                        details: { results: results.map((r) => r.details) },
-                    },
-                    null,
-                    2,
-                ),
+                text: JSON.stringify({
+                    summary,
+                    details: { results: results.map((r) => r.details) },
+                }),
             },
         ],
     };
@@ -145,7 +86,8 @@ function buildResult(r, include_box_model) {
     const filtered = filterComputedStyles(r.styles ?? {});
     const visibilityIssues = detectVisibilityIssues(filtered);
     const layoutIssues = detectLayoutIssues(filtered);
-    const allIssues = [...visibilityIssues, ...layoutIssues];
+    const obstructionIssues = detectObstructionIssues(r);
+    const allIssues = [...visibilityIssues, ...layoutIssues, ...obstructionIssues];
 
     if (!include_box_model) {
         for (const p of [
@@ -235,4 +177,84 @@ function buildSummary(selector, issues, styles) {
     }
 
     return `${selector}: ${parts.join("; ")}`;
+}
+
+// The page-side script. Kept as one payload so a batch of selectors costs a single
+// round-trip, and exported so its syntax and hit-test logic stay under test.
+export function buildScript(selectors) {
+    return `() => {
+        const selectors = ${JSON.stringify(selectors)};
+        function suggest(sel) {
+          const out = new Set();
+          const idTokens = [...sel.matchAll(/#([\\w-]+)/g)].map(m => m[1].toLowerCase());
+          const classTokens = [...sel.matchAll(/\\.([\\w-]+)/g)].map(m => m[1].toLowerCase());
+          if (idTokens.length) {
+            document.querySelectorAll('[id]').forEach(el => {
+              const id = el.id.toLowerCase();
+              for (const t of idTokens) {
+                if (id === t || id.includes(t) || t.includes(id)) out.add('#' + el.id);
+              }
+            });
+          }
+          if (classTokens.length) {
+            const seen = new Set();
+            document.querySelectorAll('[class]').forEach(el => {
+              el.classList.forEach(c => {
+                if (seen.has(c)) return;
+                seen.add(c);
+                const lc = c.toLowerCase();
+                for (const t of classTokens) {
+                  if (lc === t || lc.includes(t) || t.includes(lc)) out.add('.' + c);
+                }
+              });
+            });
+          }
+          const tokens = [...idTokens, ...classTokens];
+          const refLen = tokens.length ? Math.max(...tokens.map(t => t.length)) : 0;
+          return [...out].sort((a, b) => Math.abs(a.length - refLen) - Math.abs(b.length - refLen)).slice(0, 5);
+        }
+        function describe(el) {
+          const tag = el.tagName.toLowerCase();
+          if (el.id) return tag + '#' + el.id;
+          if (el.classList.length) return tag + '.' + el.classList[0];
+          return tag;
+        }
+        function hitTest(el, rect) {
+          if (rect.width <= 0 || rect.height <= 0) return { obstruction: null, offScreen: false };
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight) {
+            return { obstruction: null, offScreen: true };
+          }
+          const hit = document.elementFromPoint(cx, cy);
+          // A descendant on top is normal: the click still lands inside the element.
+          if (!hit || hit === el || el.contains(hit)) return { obstruction: null, offScreen: false };
+          const hs = window.getComputedStyle(hit);
+          const hr = hit.getBoundingClientRect();
+          return {
+            obstruction: {
+              selector: describe(hit),
+              position: hs.position,
+              zIndex: hs.zIndex,
+              coversViewport: hr.width >= window.innerWidth * 0.9 && hr.height >= window.innerHeight * 0.9,
+            },
+            offScreen: false,
+          };
+        }
+        const results = selectors.map(sel => {
+          let el = null;
+          try { el = document.querySelector(sel); } catch (e) { return { selector: sel, notFound: true, error: e.message, suggestions: [] }; }
+          if (!el) return { selector: sel, notFound: true, suggestions: suggest(sel) };
+          const cs = window.getComputedStyle(el);
+          const styles = {};
+          for (let i = 0; i < cs.length; i++) {
+            const prop = cs[i];
+            styles[prop] = cs.getPropertyValue(prop);
+          }
+          const rect = el.getBoundingClientRect();
+          const ht = hitTest(el, rect);
+          return { selector: sel, styles, rect: { width: rect.width, height: rect.height, top: rect.top, left: rect.left }, obstruction: ht.obstruction, offScreen: ht.offScreen };
+        });
+        return { results };
+      }`;
 }
