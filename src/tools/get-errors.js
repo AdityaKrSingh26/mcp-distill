@@ -89,7 +89,7 @@ export async function handleGetErrors({ severity, limit, resolve_sourcemaps }) {
         content: [
             {
                 type: "text",
-                text: JSON.stringify({ summary, details }, null, 2),
+                text: JSON.stringify({ summary, details }),
             },
         ],
     };

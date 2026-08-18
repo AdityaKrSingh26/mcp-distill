@@ -70,3 +70,44 @@ export function detectVisibilityIssues(styles) {
 
     return issues;
 }
+
+/**
+ * Turns an in-page hit test into issues.
+ *
+ * An element can be fully visible by every computed style and still be
+ * unclickable because something else sits on top of it, which no amount of
+ * style inspection reveals.
+ */
+export function detectObstructionIssues({ obstruction, offScreen } = {}) {
+    // The hit test cannot run outside the viewport, so this is the whole answer.
+    if (offScreen) {
+        return [
+            {
+                type: "off-screen",
+                property: "viewport",
+                value: "outside",
+                severity: "low",
+                note: "element center is outside the viewport; scroll it into view before clicking",
+            },
+        ];
+    }
+
+    if (!obstruction) {
+        return [];
+    }
+
+    const where = `position:${obstruction.position}, z-index:${obstruction.zIndex}`;
+    const note = obstruction.coversViewport
+        ? `${obstruction.selector} covers the viewport (${where}) and intercepts clicks`
+        : `${obstruction.selector} (${where}) sits on top and intercepts clicks`;
+
+    return [
+        {
+            type: "obscured",
+            property: "covered-by",
+            value: obstruction.selector,
+            severity: "high",
+            note,
+        },
+    ];
+}
