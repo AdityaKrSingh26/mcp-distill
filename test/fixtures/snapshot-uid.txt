@@ -1,0 +1,13 @@
+# Page content
+uid=1_0 RootWebArea "Checkout"
+  uid=1_1 banner
+    uid=1_2 link "Shop"
+  uid=1_3 main
+    uid=1_4 heading "Checkout"
+    uid=1_5 generic
+      uid=1_6 generic
+        uid=1_7 button
+          uid=1_8 StaticText "Place order"
+    uid=1_9 textbox "Card number"
+  uid=1_10 contentinfo
+    uid=1_11 StaticText "Copyright 2026"

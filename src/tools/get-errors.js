@@ -1,4 +1,5 @@
-import { callTool, listTools } from "../client.js";
+import { callTool } from "../client.js";
+import { findBackendTool, CONSOLE_TOOLS, CONSOLE_PATTERN } from "../capabilities.js";
 import { deduplicateErrors } from "../analysis/console-dedup.js";
 import { createResolver } from "../analysis/sourcemap.js";
 import { parseFencedJson } from "../util.js";
@@ -6,7 +7,7 @@ import { parseFencedJson } from "../util.js";
 export async function handleGetErrors({ severity, limit, resolve_sourcemaps }) {
     const types =
         severity === "error" ? ["error"] : severity === "warning" ? ["warn", "error"] : [];
-    const candidates = ["list_console_messages", "getConsoleHistory", "get_console_logs"];
+    const candidates = CONSOLE_TOOLS;
     const errors = [];
     let raw;
 
@@ -23,20 +24,12 @@ export async function handleGetErrors({ severity, limit, resolve_sourcemaps }) {
     }
 
     if (raw === undefined) {
-        let tools = [];
-        try {
-            tools = await listTools();
-        } catch {
-            // no discovery available; fall through to the error report below
-        }
-        const discovered = tools.find(
-            (t) => !candidates.includes(t.name) && /console|log/i.test(t.name),
-        );
-        if (discovered) {
+        const discovered = await findBackendTool([], CONSOLE_PATTERN);
+        if (discovered && !candidates.includes(discovered)) {
             try {
-                raw = await callTool(discovered.name, {});
+                raw = await callTool(discovered, {});
             } catch (err) {
-                errors.push(`${discovered.name}: ${err.message}`);
+                errors.push(`${discovered}: ${err.message}`);
             }
         }
     }
