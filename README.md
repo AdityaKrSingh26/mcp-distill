@@ -43,6 +43,7 @@ flowchart TD
 | `diagnose_element` on a `body` element | ~6,000 tokens | ~300 tokens | 95% |
 | `get_errors` on a React app with console noise | ~4,000 tokens | ~200 tokens | 95% |
 | `get_page_outline` on a 100-item product listing | ~6,200 tokens | ~230 tokens | 96% |
+| `get_network_summary` on a 160-request page | ~13,000 tokens | ~180 tokens | 98% |
 
 ---
 
@@ -247,6 +248,44 @@ How it compresses:
 - **Repeated runs fold into a count.** 100 identical product cards become 3 plus `{"role":"listitem","repeated":97}`, which is where most of the savings on real pages come from.
 - **Icon-only controls borrow a label.** An unnamed button whose text lives on a child node is reported with that name. Landmarks deliberately do not borrow, since that would invent a label the page never had.
 - **Long names are truncated** to 60 characters.
+
+---
+
+### `get_network_summary`
+
+Fetches the page's network requests and compresses them into a diagnostic report: what failed, what was slow, what was heavy, and what got fetched more than once. Everything else collapses into counts.
+
+The backend's network tool is discovered at runtime (`list_network_requests`, `browser_network_requests`, or any tool matching `/network|requests|har/`), and both JSON records and the one-line-per-request text form are understood.
+
+Parameters:
+- `limit` (number, default: `10`): max entries listed per section (failures, slowest, largest, duplicates)
+
+Example output:
+```json
+{
+  "summary": "162 requests, 2 failed, 1 slow (>1s), 2.6 MB.",
+  "details": {
+    "total_requests": 162,
+    "by_status": { "2xx": 160, "4xx": 1, "5xx": 1 },
+    "by_type": { "script": 106, "image": 54 },
+    "total_bytes": 2762517,
+    "failures": [
+      { "method": "POST", "url": "https://api.example.com/checkout", "status": 500, "type": "xhr" }
+    ],
+    "slowest": [{ "url": "https://cdn.example.com/vendor.js", "duration_ms": 2400 }],
+    "largest": [{ "url": "https://cdn.example.com/vendor.js", "size_bytes": 840000 }],
+    "duplicates": [{ "request": "GET https://api.example.com/me", "count": 3 }]
+  }
+}
+```
+
+What it reports:
+- **Failures**: any 4xx/5xx, plus requests the browser marked failed, blocked, or aborted, so a CORS rejection or a dead endpoint surfaces without reading the log.
+- **Slowest**: only requests over 1s. A page where nothing is slow spends no tokens on timing.
+- **Largest**: only payloads over 100 kB, which is where page weight actually comes from.
+- **Duplicates**: the same method and URL fetched more than once, the usual signature of a render loop or a missing cache.
+
+Sections the backend gave no data for are omitted rather than emitted empty, and URLs longer than 120 characters are truncated.
 
 ---
 

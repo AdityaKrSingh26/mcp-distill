@@ -4,6 +4,7 @@ import { z } from "zod";
 import { handleDiagnoseElement } from "./tools/diagnose-element.js";
 import { handleGetErrors } from "./tools/get-errors.js";
 import { handleGetPageOutline } from "./tools/page-outline.js";
+import { handleGetNetworkSummary } from "./tools/network-summary.js";
 
 export function createServer() {
     const server = new McpServer({
@@ -72,6 +73,23 @@ export function createServer() {
                 .describe("Max number of nodes to return"),
         },
         handleGetPageOutline,
+    );
+
+    server.tool(
+        "get_network_summary",
+        "Fetches the page's network requests and compresses them into a diagnostic summary: failed requests, requests slower than 1s, oversized payloads, duplicate fetches, and per-status/per-type counts. Turns a few hundred raw request records into a short report.",
+        {
+            limit: z
+                .number()
+                .int()
+                .min(1)
+                .max(50)
+                .default(10)
+                .describe(
+                    "Max entries listed per section (failures, slowest, largest, duplicates)",
+                ),
+        },
+        handleGetNetworkSummary,
     );
 
     return server;
