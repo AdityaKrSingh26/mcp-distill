@@ -91,6 +91,8 @@ Replace `chrome-devtools-mcp` with whatever browser MCP you already use (`playwr
 
 Fetches computed styles for one or more CSS selectors, runs heuristic analysis, and returns a compressed report identifying likely visual bugs. When a selector matches nothing, the same call returns up to 5 closest-match suggestions (no second round-trip needed).
 
+The backend's script evaluation tool is discovered at runtime (`evaluate_script`, `browser_evaluate`, or any tool matching `/evaluate|eval_js|execute_script/`), so the same diagnosis works across browser MCPs.
+
 Parameters:
 - `selector` (string | string[]): CSS selector or array of selectors (max 20). e.g. `"#submit-button"` or `["#header", "#main", ".footer"]`
 - `include_box_model` (boolean, default: `true`): include margin/padding/border in output
