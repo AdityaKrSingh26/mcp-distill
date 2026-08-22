@@ -9,6 +9,9 @@ export const CONSOLE_PATTERN = /console|log/i;
 export const SNAPSHOT_TOOLS = ["take_snapshot", "browser_snapshot"];
 export const SNAPSHOT_PATTERN = /snapshot|accessibility|a11y/i;
 
+export const NETWORK_TOOLS = ["list_network_requests", "browser_network_requests"];
+export const NETWORK_PATTERN = /network|requests|har/i;
+
 export const EVAL_TOOLS = ["evaluate_script", "browser_evaluate"];
 export const EVAL_PATTERN = /evaluate|eval_js|execute_script/i;
 
