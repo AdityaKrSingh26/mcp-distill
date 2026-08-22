@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detectVisibilityIssues, detectObstructionIssues } from "../src/analysis/visibility.js";
+import {
+    detectVisibilityIssues,
+    detectObstructionIssues,
+    detectAncestorIssues,
+} from "../src/analysis/visibility.js";
 
 test("detects opacity:0", () => {
     const issues = detectVisibilityIssues({
@@ -98,4 +102,41 @@ test("no obstruction issue for an unobstructed element", () => {
 test("tolerates a result carrying no hit test at all", () => {
     assert.deepEqual(detectObstructionIssues({}), []);
     assert.deepEqual(detectObstructionIssues(), []);
+});
+
+test("names the ancestor, its depth, and what it does", () => {
+    const issues = detectAncestorIssues([{ selector: "div#modal", depth: 2, opacity: "0" }]);
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].type, "ancestor-invisible");
+    assert.equal(issues[0].property, "ancestor-opacity");
+    assert.equal(issues[0].severity, "high");
+    assert.equal(issues[0].note, "ancestor div#modal (2 levels up) has opacity:0");
+});
+
+test("uses the singular for a direct parent", () => {
+    const issues = detectAncestorIssues([{ selector: "div.wrap", depth: 1, display: "none" }]);
+    assert.ok(issues[0].note.includes("(1 level up)"));
+});
+
+test("reports a pointer-events wrapper as a low-severity click blocker", () => {
+    const issues = detectAncestorIssues([
+        { selector: "div.overlay", depth: 3, pointerEvents: "none" },
+    ]);
+    assert.equal(issues[0].severity, "low");
+    assert.equal(issues[0].type, "ancestor-unclickable");
+});
+
+test("reports every hiding condition on one ancestor", () => {
+    const issues = detectAncestorIssues([
+        { selector: "div#a", depth: 1, display: "none", visibility: "hidden" },
+    ]);
+    assert.deepEqual(
+        issues.map((i) => i.property),
+        ["ancestor-display", "ancestor-visibility"],
+    );
+});
+
+test("tolerates a result carrying no ancestor chain", () => {
+    assert.deepEqual(detectAncestorIssues(undefined), []);
+    assert.deepEqual(detectAncestorIssues([]), []);
 });

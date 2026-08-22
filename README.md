@@ -132,6 +132,29 @@ Example output (batch, with a typo selector triggering suggestions):
 
 Detects: `opacity:0`, `display:none`, `visibility:hidden`, `clip-path` clipping, zero-size with `overflow:hidden`, `pointer-events:none`, unanchored absolute positioning, `z-index` on static elements, and elements covered by something else.
 
+**Hidden ancestors.** An element's own computed style says nothing about a wrapper that is itself hidden: `opacity` does not inherit, and a child of a `display:none` parent still computes its own `display`. Element-only inspection therefore reports "no obvious visual issues" on one of the most common CSS bug classes. `diagnose_element` walks the parent chain in the same round-trip and names the wrapper responsible:
+
+```json
+{
+  "summary": "#confirm-button: ancestor-opacity:0 (likely cause)",
+  "details": {
+    "selector": "#confirm-button",
+    "issues": [
+      {
+        "type": "ancestor-invisible",
+        "property": "ancestor-opacity",
+        "value": "0",
+        "severity": "high",
+        "note": "ancestor div#modal (3 levels up) has opacity:0"
+      }
+    ],
+    "styles": { "display": "inline-flex", "opacity": "1", "visibility": "visible" }
+  }
+}
+```
+
+Detected on ancestors: `display:none`, `opacity:0`, `visibility:hidden`, a collapsed box (0 width or height with overflow hidden, the classic closed accordion), and `pointer-events:none`. At most 3 hiding ancestors are reported, closest first, and only offending ones are returned, so a healthy page adds nothing to the payload. When an ancestor is hiding the element, the element's own `zero-width`/`zero-height` findings are dropped: a 0x0 box is a consequence there, not a second cause.
+
 **Click blockers.** An element can pass every style check and still be unclickable because something sits on top of it. `diagnose_element` hit-tests each element's center with `document.elementFromPoint` and names whatever intercepts the click:
 
 ```json

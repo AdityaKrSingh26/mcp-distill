@@ -1,7 +1,11 @@
 import { callTool } from "../client.js";
 import { findBackendTool, EVAL_TOOLS, EVAL_PATTERN } from "../capabilities.js";
 import { filterComputedStyles } from "../analysis/css-filter.js";
-import { detectVisibilityIssues, detectObstructionIssues } from "../analysis/visibility.js";
+import {
+    detectVisibilityIssues,
+    detectObstructionIssues,
+    detectAncestorIssues,
+} from "../analysis/visibility.js";
 import { detectLayoutIssues } from "../analysis/layout.js";
 import { parseFencedJson } from "../util.js";
 
@@ -105,7 +109,23 @@ function buildResult(r, include_box_model) {
     const visibilityIssues = detectVisibilityIssues(filtered);
     const layoutIssues = detectLayoutIssues(filtered);
     const obstructionIssues = detectObstructionIssues(r);
-    const allIssues = [...visibilityIssues, ...layoutIssues, ...obstructionIssues];
+    const ancestorIssues = detectAncestorIssues(r.ancestors);
+
+    // A hidden ancestor gives every descendant a 0x0 box, so the element's own
+    // zero-size issues are a symptom of it rather than a second cause.
+    const hiddenByAncestor = ancestorIssues.some(
+        (i) => i.type === "ancestor-hidden" || i.type === "ancestor-invisible",
+    );
+    const ownLayoutIssues = hiddenByAncestor
+        ? layoutIssues.filter((i) => i.type !== "zero-width" && i.type !== "zero-height")
+        : layoutIssues;
+
+    const allIssues = [
+        ...ancestorIssues,
+        ...visibilityIssues,
+        ...ownLayoutIssues,
+        ...obstructionIssues,
+    ];
 
     if (!include_box_model) {
         for (const p of [
@@ -237,6 +257,30 @@ export function buildScript(selectors) {
           if (el.classList.length) return tag + '.' + el.classList[0];
           return tag;
         }
+        // Only ancestors that can hide or block a descendant are returned: an
+        // opacity:0 wrapper is invisible from the element's own computed style,
+        // which is why element-only inspection reports "no issues" on it.
+        function hidingAncestors(el) {
+          const out = [];
+          let node = el.parentElement;
+          let depth = 1;
+          while (node && out.length < 3) {
+            const s = window.getComputedStyle(node);
+            const r = node.getBoundingClientRect();
+            const flags = {};
+            if (s.display === 'none') flags.display = 'none';
+            const op = parseFloat(s.opacity);
+            if (!isNaN(op) && op === 0) flags.opacity = s.opacity;
+            if (s.visibility === 'hidden' || s.visibility === 'collapse') flags.visibility = s.visibility;
+            if (s.overflowY === 'hidden' && r.height === 0) flags.collapsed = '0 height';
+            else if (s.overflowX === 'hidden' && r.width === 0) flags.collapsed = '0 width';
+            if (s.pointerEvents === 'none') flags.pointerEvents = 'none';
+            if (Object.keys(flags).length) out.push(Object.assign({ selector: describe(node), depth }, flags));
+            node = node.parentElement;
+            depth++;
+          }
+          return out;
+        }
         function hitTest(el, rect) {
           if (rect.width <= 0 || rect.height <= 0) return { obstruction: null, offScreen: false };
           const cx = rect.left + rect.width / 2;
@@ -271,7 +315,7 @@ export function buildScript(selectors) {
           }
           const rect = el.getBoundingClientRect();
           const ht = hitTest(el, rect);
-          return { selector: sel, styles, rect: { width: rect.width, height: rect.height, top: rect.top, left: rect.left }, obstruction: ht.obstruction, offScreen: ht.offScreen };
+          return { selector: sel, styles, rect: { width: rect.width, height: rect.height, top: rect.top, left: rect.left }, obstruction: ht.obstruction, offScreen: ht.offScreen, ancestors: hidingAncestors(el) };
         });
         return { results };
       }`;
