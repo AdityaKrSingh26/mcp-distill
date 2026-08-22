@@ -2,11 +2,11 @@ export function detectVisibilityIssues(styles) {
     const issues = [];
 
     if (styles.display === "none") {
-        issues.push({ 
-            type: "hidden", 
-            property: "display", 
-            value: "none", 
-            severity: "high" 
+        issues.push({
+            type: "hidden",
+            property: "display",
+            value: "none",
+            severity: "high",
         });
     }
 
@@ -48,7 +48,7 @@ export function detectVisibilityIssues(styles) {
     if (styles.overflow === "hidden") {
         const w = parseFloat(styles.width);
         const h = parseFloat(styles.height);
-        
+
         if ((!isNaN(w) && w === 0) || (!isNaN(h) && h === 0)) {
             issues.push({
                 type: "clipped-zero-size",
@@ -110,4 +110,78 @@ export function detectObstructionIssues({ obstruction, offScreen } = {}) {
             note,
         },
     ];
+}
+
+// Maps the flags the page script found on an element's ancestors onto issues.
+// Ordered by how directly each condition hides the element, so the first entry
+// is the one worth reporting as the cause.
+const ANCESTOR_CHECKS = [
+    {
+        flag: "display",
+        property: "ancestor-display",
+        type: "ancestor-hidden",
+        severity: "high",
+        describe: (value) => `has display:${value}`,
+    },
+    {
+        flag: "opacity",
+        property: "ancestor-opacity",
+        type: "ancestor-invisible",
+        severity: "high",
+        describe: (value) => `has opacity:${value}`,
+    },
+    {
+        flag: "visibility",
+        property: "ancestor-visibility",
+        type: "ancestor-hidden",
+        severity: "high",
+        describe: (value) => `has visibility:${value}`,
+    },
+    {
+        flag: "collapsed",
+        property: "ancestor-collapsed",
+        type: "ancestor-clipped",
+        severity: "high",
+        describe: (value) => `is collapsed to ${value} with overflow hidden, clipping its children`,
+    },
+    {
+        flag: "pointerEvents",
+        property: "ancestor-pointer-events",
+        type: "ancestor-unclickable",
+        severity: "low",
+        describe: () => `has pointer-events:none, which blocks clicks on its descendants`,
+    },
+];
+
+/**
+ * Turns hiding ancestors into issues.
+ *
+ * An element's own computed style says nothing about a wrapper that is itself
+ * hidden: opacity does not inherit, and a child of a display:none parent still
+ * computes its own display. Without the chain, the most common CSS bug class
+ * reads as "no obvious visual issues detected".
+ */
+export function detectAncestorIssues(ancestors) {
+    if (!Array.isArray(ancestors)) {
+        return [];
+    }
+
+    const issues = [];
+    for (const ancestor of ancestors) {
+        for (const check of ANCESTOR_CHECKS) {
+            const value = ancestor[check.flag];
+            if (value === undefined) {
+                continue;
+            }
+            const levels = ancestor.depth === 1 ? "1 level up" : `${ancestor.depth} levels up`;
+            issues.push({
+                type: check.type,
+                property: check.property,
+                value,
+                severity: check.severity,
+                note: `ancestor ${ancestor.selector} (${levels}) ${check.describe(value)}`,
+            });
+        }
+    }
+    return issues;
 }

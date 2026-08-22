@@ -12,12 +12,24 @@ function makeElement({ tag = "div", id = "", classes = [], rect, styles = {} }) 
         classList: classes,
         children: [],
         styles,
+        parentElement: null,
         getBoundingClientRect: () => ({ width: 0, height: 0, top: 0, left: 0, ...rect }),
         contains(other) {
             return other === el || el.children.some((c) => c.contains(other));
         },
     };
     return el;
+}
+
+// Links a target to its ancestors, outermost last, the way parentElement walks.
+function nest(target, ...ancestors) {
+    let child = target;
+    for (const ancestor of ancestors) {
+        ancestor.children.push(child);
+        child.parentElement = ancestor;
+        child = ancestor;
+    }
+    return target;
 }
 
 function makeEnv({ elements = {}, hit = null, viewport = { width: 1000, height: 800 } }) {
@@ -28,6 +40,12 @@ function makeEnv({ elements = {}, hit = null, viewport = { width: 1000, height: 
             getPropertyValue: (prop) => el.styles?.[prop] ?? "",
             position: el.styles?.position ?? "static",
             zIndex: el.styles?.["z-index"] ?? "auto",
+            display: el.styles?.display ?? "block",
+            opacity: el.styles?.opacity ?? "1",
+            visibility: el.styles?.visibility ?? "visible",
+            overflowX: el.styles?.["overflow-x"] ?? "visible",
+            overflowY: el.styles?.["overflow-y"] ?? "visible",
+            pointerEvents: el.styles?.["pointer-events"] ?? "auto",
         };
         entries.forEach(([prop], i) => {
             decl[i] = prop;
@@ -162,4 +180,67 @@ test("collects computed styles for the target", () => {
     const { results } = run(buildScript(["#submit"]), env);
     assert.equal(results[0].styles.display, "flex");
     assert.equal(results[0].styles.opacity, "0");
+});
+
+test("names an invisible ancestor the element's own styles cannot reveal", () => {
+    const target = makeElement({
+        tag: "button",
+        id: "submit",
+        rect: { width: 100, height: 40 },
+        styles: { display: "block", opacity: "1", visibility: "visible" },
+    });
+    const wrapper = makeElement({
+        tag: "div",
+        classes: ["inner"],
+        rect: { width: 100, height: 40 },
+    });
+    const modal = makeElement({
+        tag: "div",
+        id: "modal",
+        rect: { width: 100, height: 40 },
+        styles: { opacity: "0" },
+    });
+    nest(target, wrapper, modal);
+    const env = makeEnv({ elements: { "#submit": target }, hit: target });
+
+    const { results } = run(buildScript(["#submit"]), env);
+    assert.deepEqual(results[0].ancestors, [{ selector: "div#modal", depth: 2, opacity: "0" }]);
+});
+
+test("reports a collapsed accordion wrapper as clipping", () => {
+    const target = makeElement({ tag: "a", id: "link", rect: { width: 80, height: 20 } });
+    const panel = makeElement({
+        tag: "section",
+        classes: ["panel"],
+        rect: { width: 300, height: 0 },
+        styles: { "overflow-y": "hidden" },
+    });
+    nest(target, panel);
+    const env = makeEnv({ elements: { "#link": target }, hit: target });
+
+    const { results } = run(buildScript(["#link"]), env);
+    assert.deepEqual(results[0].ancestors, [
+        { selector: "section.panel", depth: 1, collapsed: "0 height" },
+    ]);
+});
+
+test("returns no ancestors when every wrapper is healthy", () => {
+    const target = makeElement({ tag: "button", id: "submit", rect: { width: 100, height: 40 } });
+    const wrapper = makeElement({ tag: "div", rect: { width: 200, height: 100 } });
+    nest(target, wrapper);
+    const env = makeEnv({ elements: { "#submit": target }, hit: target });
+
+    const { results } = run(buildScript(["#submit"]), env);
+    assert.deepEqual(results[0].ancestors, []);
+});
+
+test("stops after three hiding ancestors", () => {
+    const target = makeElement({ tag: "button", id: "submit", rect: { width: 10, height: 10 } });
+    const hidden = () =>
+        makeElement({ tag: "div", rect: { width: 10, height: 10 }, styles: { display: "none" } });
+    nest(target, hidden(), hidden(), hidden(), hidden());
+    const env = makeEnv({ elements: { "#submit": target }, hit: target });
+
+    const { results } = run(buildScript(["#submit"]), env);
+    assert.equal(results[0].ancestors.length, 3);
 });
