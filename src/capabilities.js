@@ -9,6 +9,9 @@ export const CONSOLE_PATTERN = /console|log/i;
 export const SNAPSHOT_TOOLS = ["take_snapshot", "browser_snapshot"];
 export const SNAPSHOT_PATTERN = /snapshot|accessibility|a11y/i;
 
+export const EVAL_TOOLS = ["evaluate_script", "browser_evaluate"];
+export const EVAL_PATTERN = /evaluate|eval_js|execute_script/i;
+
 let namesCache = null;
 
 async function backendToolNames() {
@@ -24,11 +27,10 @@ async function backendToolNames() {
     return namesCache;
 }
 
-// Resolves a capability to a concrete backend tool name, preferring the known
-// names and falling back to pattern discovery so unfamiliar backends still work.
-export async function findBackendTool(preferred, pattern) {
-    const names = await backendToolNames();
-
+// Picks a capability out of a known set of backend tool names, preferring the
+// known names in order and falling back to pattern discovery so unfamiliar
+// backends still work.
+export function pickTool(names, preferred, pattern) {
     for (const name of preferred) {
         if (names.includes(name)) {
             return name;
@@ -36,4 +38,9 @@ export async function findBackendTool(preferred, pattern) {
     }
 
     return names.find((name) => pattern.test(name)) ?? null;
+}
+
+// Resolves a capability to a concrete tool name on the connected backend.
+export async function findBackendTool(preferred, pattern) {
+    return pickTool(await backendToolNames(), preferred, pattern);
 }

@@ -1,4 +1,5 @@
 import { callTool } from "../client.js";
+import { findBackendTool, EVAL_TOOLS, EVAL_PATTERN } from "../capabilities.js";
 import { filterComputedStyles } from "../analysis/css-filter.js";
 import { detectVisibilityIssues, detectObstructionIssues } from "../analysis/visibility.js";
 import { detectLayoutIssues } from "../analysis/layout.js";
@@ -8,16 +9,33 @@ export async function handleDiagnoseElement({ selector, include_box_model }) {
     const selectors = Array.isArray(selector) ? selector : [selector];
     const isBatch = Array.isArray(selector);
 
+    const evalTool = await findBackendTool(EVAL_TOOLS, EVAL_PATTERN);
+    if (!evalTool) {
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: JSON.stringify({
+                        _lens_warning:
+                            "No script evaluation tool found on the backend MCP. Expected one of: " +
+                            EVAL_TOOLS.join(", "),
+                        selector,
+                    }),
+                },
+            ],
+        };
+    }
+
     let raw;
     try {
-        raw = await callTool("evaluate_script", { function: buildScript(selectors) });
+        raw = await callTool(evalTool, { function: buildScript(selectors) });
     } catch (err) {
         return {
             content: [
                 {
                     type: "text",
                     text: JSON.stringify({
-                        _lens_warning: `Could not fetch computed styles: ${err.message}`,
+                        _lens_warning: `Could not fetch computed styles via ${evalTool}: ${err.message}`,
                         selector,
                     }),
                 },
